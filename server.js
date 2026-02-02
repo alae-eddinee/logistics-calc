@@ -56,33 +56,61 @@ app.use(session(sessionConfig));
 // Database initialization
 // For Vercel, we need to use a different database approach
 const dbPath = isVercel ? '/tmp/logistics_calculator.db' : './logistics_calculator.db';
-const db = new sqlite3.Database(dbPath);
+
+let db;
+try {
+    db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            console.error('Error opening database:', err.message);
+        } else {
+            console.log('Connected to SQLite database at:', dbPath);
+        }
+    });
+} catch (error) {
+    console.error('Database initialization error:', error);
+}
 
 // Create tables if they don't exist
-db.serialize(() => {
-    // Users table
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+if (db) {
+    db.serialize(() => {
+        // Users table
+        db.run(`CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) {
+                console.error('Error creating users table:', err);
+            } else {
+                console.log('Users table ready');
+            }
+        });
 
-    // User sessions/calculations table
-    db.run(`CREATE TABLE IF NOT EXISTS user_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        session_name TEXT NOT NULL,
-        session_data TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )`);
+        // User sessions/calculations table
+        db.run(`CREATE TABLE IF NOT EXISTS user_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            session_name TEXT NOT NULL,
+            session_data TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )`, (err) => {
+            if (err) {
+                console.error('Error creating sessions table:', err);
+            } else {
+                console.log('Sessions table ready');
+            }
+        });
 
-    // Auto-create test users
-    createTestUsers();
-});
+        // Auto-create test users
+        createTestUsers();
+    });
+} else {
+    console.error('Database not available');
+}
 
 // Function to create test users
 async function createTestUsers() {
@@ -127,6 +155,22 @@ function isAuthenticated(req, res, next) {
         res.status(401).json({ error: 'Unauthorized' });
     }
 }
+
+// Error handling wrapper
+function asyncHandler(fn) {
+    return (req, res, next) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+}
+
+// Global error handler
+app.use((error, req, res, next) => {
+    console.error('Global error handler:', error);
+    res.status(500).json({ 
+        error: 'Internal server error',
+        message: isVercel ? 'Server error occurred' : error.message 
+    });
+});
 
 // Routes
 
@@ -198,11 +242,16 @@ app.post('/api/register', async (req, res) => {
 });
 
 // User login
-app.post('/api/login', (req, res) => {
+app.post('/api/login', asyncHandler(async (req, res) => {
     const { username, password } = req.body;
 
     console.log('Login attempt for username:', username);
     console.log('Session before login:', req.session);
+
+    if (!db) {
+        console.error('Database not available');
+        return res.status(500).json({ error: 'Database not available' });
+    }
 
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
@@ -235,7 +284,7 @@ app.post('/api/login', (req, res) => {
             res.status(500).json({ error: 'Server error' });
         }
     });
-});
+}));
 
 // User logout
 app.post('/api/logout', (req, res) => {
