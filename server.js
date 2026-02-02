@@ -14,17 +14,21 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors({
     origin: isVercel ? true : ['http://localhost:3000'],
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
 // Log all requests
-if (!isVercel) {
-    app.use((req, res, next) => {
+app.use((req, res, next) => {
+    if (isVercel) {
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    } else {
         console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-        next();
-    });
-}
+    }
+    next();
+});
 
 // Session configuration
 const sessionConfig = {
@@ -125,6 +129,16 @@ function isAuthenticated(req, res, next) {
 }
 
 // Routes
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    console.log('Health check requested');
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        environment: isVercel ? 'vercel' : 'local'
+    });
+});
 
 // Serve login page as default
 app.get('/', (req, res) => {
