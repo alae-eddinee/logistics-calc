@@ -14,21 +14,17 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors({
     origin: isVercel ? true : ['http://localhost:3000'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    credentials: true
 }));
 app.use(express.json());
 
 // Log all requests
-app.use((req, res, next) => {
-    if (isVercel) {
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    } else {
+if (!isVercel) {
+    app.use((req, res, next) => {
         console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    }
-    next();
-});
+        next();
+    });
+}
 
 // Session configuration
 const sessionConfig = {
@@ -56,61 +52,33 @@ app.use(session(sessionConfig));
 // Database initialization
 // For Vercel, we need to use a different database approach
 const dbPath = isVercel ? '/tmp/logistics_calculator.db' : './logistics_calculator.db';
-
-let db;
-try {
-    db = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-            console.error('Error opening database:', err.message);
-        } else {
-            console.log('Connected to SQLite database at:', dbPath);
-        }
-    });
-} catch (error) {
-    console.error('Database initialization error:', error);
-}
+const db = new sqlite3.Database(dbPath);
 
 // Create tables if they don't exist
-if (db) {
-    db.serialize(() => {
-        // Users table
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`, (err) => {
-            if (err) {
-                console.error('Error creating users table:', err);
-            } else {
-                console.log('Users table ready');
-            }
-        });
+db.serialize(() => {
+    // Users table
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
 
-        // User sessions/calculations table
-        db.run(`CREATE TABLE IF NOT EXISTS user_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            session_name TEXT NOT NULL,
-            session_data TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )`, (err) => {
-            if (err) {
-                console.error('Error creating sessions table:', err);
-            } else {
-                console.log('Sessions table ready');
-            }
-        });
+    // User sessions/calculations table
+    db.run(`CREATE TABLE IF NOT EXISTS user_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_name TEXT NOT NULL,
+        session_data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )`);
 
-        // Auto-create test users
-        createTestUsers();
-    });
-} else {
-    console.error('Database not available');
-}
+    // Auto-create test users
+    createTestUsers();
+});
 
 // Function to create test users
 async function createTestUsers() {
@@ -156,33 +124,7 @@ function isAuthenticated(req, res, next) {
     }
 }
 
-// Error handling wrapper
-function asyncHandler(fn) {
-    return (req, res, next) => {
-        Promise.resolve(fn(req, res, next)).catch(next);
-    };
-}
-
-// Global error handler
-app.use((error, req, res, next) => {
-    console.error('Global error handler:', error);
-    res.status(500).json({ 
-        error: 'Internal server error',
-        message: isVercel ? 'Server error occurred' : error.message 
-    });
-});
-
 // Routes
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    console.log('Health check requested');
-    res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(),
-        environment: isVercel ? 'vercel' : 'local'
-    });
-});
 
 // Serve login page as default
 app.get('/', (req, res) => {
@@ -195,15 +137,10 @@ app.get('/', (req, res) => {
 // Serve main app
 app.get('/app', (req, res) => {
     console.log('Request to /app route');
-    console.log('Session data:', req.session);
-    console.log('User ID in session:', req.session.userId);
-    
     if (!req.session.userId) {
         console.log('No session, redirecting to /');
         return res.redirect('/');
     }
-    
-    console.log('User authenticated, serving index.html');
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -242,16 +179,8 @@ app.post('/api/register', async (req, res) => {
 });
 
 // User login
-app.post('/api/login', asyncHandler(async (req, res) => {
+app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-
-    console.log('Login attempt for username:', username);
-    console.log('Session before login:', req.session);
-
-    if (!db) {
-        console.error('Database not available');
-        return res.status(500).json({ error: 'Database not available' });
-    }
 
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
@@ -259,12 +188,10 @@ app.post('/api/login', asyncHandler(async (req, res) => {
 
     db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
         if (err) {
-            console.error('Database error:', err);
             return res.status(500).json({ error: 'Database error' });
         }
 
         if (!user) {
-            console.log('User not found:', username);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -273,18 +200,15 @@ app.post('/api/login', asyncHandler(async (req, res) => {
             if (match) {
                 req.session.userId = user.id;
                 req.session.username = user.username;
-                console.log('Login successful, session after:', req.session);
                 res.json({ success: true, userId: user.id, username: user.username });
             } else {
-                console.log('Password mismatch for user:', username);
                 res.status(401).json({ error: 'Invalid credentials' });
             }
         } catch (error) {
-            console.error('Server error during login:', error);
             res.status(500).json({ error: 'Server error' });
         }
     });
-}));
+});
 
 // User logout
 app.post('/api/logout', (req, res) => {
