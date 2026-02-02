@@ -256,6 +256,7 @@
             const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
 
+            console.log('Attempting login with:', username);
             setLoading('login-btn', true);
 
             try {
@@ -267,17 +268,22 @@
                     body: JSON.stringify({ username, password })
                 });
 
+                console.log('Login response status:', response.status);
                 const data = await response.json();
+                console.log('Login response data:', data);
 
                 if (data.success) {
                     showSuccess('Connexion réussie! Redirection...');
+                    console.log('Login successful, redirecting to /app');
                     setTimeout(() => {
                         window.location.href = '/app';
                     }, 1000);
                 } else {
+                    console.error('Login failed:', data.error);
                     showError(data.error || 'Erreur de connexion');
                 }
             } catch (error) {
+                console.error('Login error:', error);
                 showError('Erreur de connexion au serveur');
             } finally {
                 setLoading('login-btn', false);

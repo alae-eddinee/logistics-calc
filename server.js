@@ -137,10 +137,15 @@ app.get('/', (req, res) => {
 // Serve main app
 app.get('/app', (req, res) => {
     console.log('Request to /app route');
+    console.log('Session data:', req.session);
+    console.log('User ID in session:', req.session.userId);
+    
     if (!req.session.userId) {
         console.log('No session, redirecting to /');
         return res.redirect('/');
     }
+    
+    console.log('User authenticated, serving index.html');
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -182,16 +187,21 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
 
+    console.log('Login attempt for username:', username);
+    console.log('Session before login:', req.session);
+
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
     }
 
     db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
         if (err) {
+            console.error('Database error:', err);
             return res.status(500).json({ error: 'Database error' });
         }
 
         if (!user) {
+            console.log('User not found:', username);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -200,11 +210,14 @@ app.post('/api/login', (req, res) => {
             if (match) {
                 req.session.userId = user.id;
                 req.session.username = user.username;
+                console.log('Login successful, session after:', req.session);
                 res.json({ success: true, userId: user.id, username: user.username });
             } else {
+                console.log('Password mismatch for user:', username);
                 res.status(401).json({ error: 'Invalid credentials' });
             }
         } catch (error) {
+            console.error('Server error during login:', error);
             res.status(500).json({ error: 'Server error' });
         }
     });
