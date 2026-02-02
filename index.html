@@ -1,0 +1,2135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur Logistique Pro</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📦</text></svg>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-body: #121212;
+            --bg-sidebar: #0a0a0a;
+            --bg-card: #1e1e1e;
+            --bg-input: #252525;
+            --border-color: #333;
+            --text-main: #e0e0e0;
+            --text-muted: #888;
+            --accent-blue: #2196F3;
+            --accent-green: #4CAF50;
+            --accent-orange: #ff9800;
+            --accent-red: #cf6679;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden; 
+            display: flex;
+        }
+
+        /* --- LAYOUT STRUCTURE --- */
+        .layout-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .brand {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 25px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .folder-list {
+            flex: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .folder-item {
+            padding: 10px 15px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-radius: 6px;
+            color: #bbb;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .folder-item:hover { background-color: #1f1f1f; color: #fff; }
+        .folder-item.active { background-color: #1e2830; color: var(--accent-blue); border-left: 3px solid var(--accent-blue); }
+
+        .btn-add-folder {
+            background: transparent; border: 1px dashed #444; color: #888;
+            padding: 8px; width: 100%; border-radius: 6px; cursor: pointer;
+            margin-top: 10px; font-size: 0.85em;
+        }
+        .btn-add-folder:hover { border-color: #666; color: #fff; }
+
+        .delete-folder-btn {
+            background: none; border: none; color: #555; cursor: pointer; font-size: 1.1em; padding: 0 5px;
+        }
+        .delete-folder-btn:hover { color: var(--accent-red); }
+
+        /* --- MAIN CONTENT --- */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            background-color: var(--bg-body);
+            position: relative;
+        }
+
+        #print-header { display: none; }
+
+        /* --- TOP BAR --- */
+        .top-bar {
+            max-width: 1400px;
+            margin: 0 auto 20px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .title-wrapper { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            flex-wrap: wrap;
+        }
+        .current-folder-title { font-size: 1.2em; font-weight: 600; color: #fff; margin: 0; }
+        .btn-edit-title {
+            background: none; border: none; cursor: pointer; font-size: 1.2em;
+            opacity: 0.6; transition: 0.2s; color: #fff;
+        }
+        .btn-edit-title:hover { opacity: 1; color: var(--accent-blue); }
+        
+        .payment-method-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+        }
+        .payment-method-selector label {
+            font-size: 0.9em;
+            color: #ccc;
+            white-space: nowrap;
+        }
+        .payment-select {
+            background-color: var(--bg-input);
+            border: 1px solid #444;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            min-width: 100px;
+        }
+        .payment-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .top-buttons { display: flex; gap: 10px; align-items: center; }
+
+        .btn-action {
+            background-color: transparent; border: 1px solid #444; color: #ccc;
+            padding: 6px 14px; font-size: 13px; font-weight: 600; border-radius: 4px;
+            cursor: pointer; display: flex; align-items: center; gap: 8px;
+            transition: all 0.2s ease; text-transform: uppercase;
+        }
+        .btn-action:hover { background-color: #2a2a2a; color: #fff; border-color: #666; }
+        .btn-new-calc:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .btn-print:hover { border-color: var(--accent-green); color: var(--accent-green); }
+        .btn-pdf:hover { border-color: #f44336; color: #f44336; }
+
+        /* --- GRID --- */
+        #app-grid { display: grid; gap: 20px; margin: 0 auto; }
+        #app-grid.grid-mode { grid-template-columns: 1fr 1fr; max-width: 1800px; }
+        #app-grid.single-mode { grid-template-columns: 1fr; max-width: 900px; }
+        @media (max-width: 768px) {
+            /* Mobile Layout */
+            body {
+                font-size: 14px;
+            }
+            
+            .layout-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                padding: 10px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            
+            .brand {
+                font-size: 1.2em;
+                margin-bottom: 10px;
+            }
+            
+            .folder-list {
+                flex-direction: row;
+                overflow-x: auto;
+                padding: 5px 0;
+                margin-bottom: 10px;
+            }
+            
+            .folder-list li {
+                min-width: 120px;
+                margin: 0 5px;
+            }
+            
+            .btn-add-folder {
+                width: 100%;
+                margin-top: 10px;
+            }
+            
+            .main-content {
+                padding: 10px;
+            }
+            
+            .top-bar {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            
+            .title-wrapper {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .payment-method-selector {
+                width: 100%;
+            }
+            
+            .top-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn-action {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            /* Grid Layout */
+            #app-grid.grid-mode {
+                grid-template-columns: 1fr !important;
+                gap: 15px !important;
+            }
+            
+            .calculator-card {
+                padding: 15px;
+            }
+            
+            /* Table Responsive */
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 4px 2px;
+                font-size: 11px;
+            }
+            
+            .header-box {
+                flex-direction: column;
+                gap: 10px;
+                padding: 10px;
+            }
+            
+            .controls-wrapper {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .control-group {
+                width: 100%;
+            }
+            
+            .calc-input {
+                width: 100%;
+            }
+            
+            .small-input, .med-input {
+                width: 100%;
+            }
+            
+            /* Buttons */
+            .btn-close-card {
+                width: 32px;
+                height: 32px;
+                font-size: 1.2em;
+            }
+            
+            /* Print Header Mobile */
+            #print-header {
+                padding: 10px;
+            }
+            
+            #print-header > div {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            /* Small Mobile */
+            .calculator-card {
+                padding: 10px;
+            }
+            
+            table {
+                font-size: 10px;
+            }
+            
+            th, td {
+                padding: 2px 1px;
+                font-size: 9px;
+            }
+            
+            .header-box label {
+                font-size: 0.75em;
+            }
+            
+            .control-group label {
+                font-size: 0.6em;
+            }
+            
+            .calc-input {
+                font-size: 12px;
+                padding: 4px;
+            }
+        }
+
+        /* --- CARD STYLES --- */
+        .calculator-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            position: relative;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .btn-close-card {
+            position: absolute; top: 15px; right: 10px;
+            background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); color: #f44336;
+            width: 28px; height: 28px; cursor: pointer; font-size: 1.1em;
+            border-radius: 4px; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease; font-weight: bold;
+        }
+        .btn-close-card:hover { 
+            background: rgba(244, 67, 54, 0.2); 
+            border-color: #f44336; 
+            color: #d32f2f;
+            transform: scale(1.1);
+        }
+
+        /* Header Box */
+        .header-box {
+            background-color: #252525; border-left: 3px solid var(--accent-blue);
+            padding: 8px 15px; margin-bottom: 15px; margin-right: 40px; border-radius: 4px;
+            display: flex; align-items: center; gap: 15px;
+        }
+        .header-box label { font-weight: 600; color: #fff; font-size: 0.85em; white-space: nowrap;}
+        .header-box input {
+            width: 100%; padding: 6px 10px; background-color: var(--bg-input);
+            border: 1px solid #333; color: #fff; border-radius: 3px; outline: none;
+        }
+
+        /* Settings */
+        .controls-wrapper {
+            background-color: #252525; border: 1px solid #333;
+            padding: 12px; margin-bottom: 15px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+        }
+        .control-group label { font-size: 0.65em; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+        .calc-input {
+            background-color: var(--bg-input); border: 1px solid #333; color: #fff;
+            padding: 5px 8px; border-radius: 3px; text-align: center; font-weight: 500; font-size: 0.9em;
+        }
+        .small-input { width: 70px; }
+        .med-input { width: 100px; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; border: 1px solid #333; table-layout: fixed; }
+        th, td { border: 1px solid #333; padding: 6px 4px; text-align: center; vertical-align: middle; font-size: 0.85em; }
+        
+        /* Dark Headers (Screen Only) */
+        .th-header { background-color: #2b2b2b; font-weight: 600; color: #bbb; font-size: 0.75em; text-transform: uppercase; }
+        .bg-unit { background-color: #333; }
+        .bg-sub { background-color: #222; }
+
+        input.table-input {
+            width: 90%; background: transparent; border: none; border-bottom: 1px solid #333;
+            color: white; text-align: center; font-size: 13px; padding: 4px;
+        }
+        select.table-select {
+            background-color: var(--bg-input); color: white; border: 1px solid #333;
+            padding: 3px; width: 95%; border-radius: 2px; text-align: center;
+        }
+        input[type="radio"] { accent-color: var(--accent-green); cursor: pointer; }
+
+        .vertical-text { 
+            writing-mode: vertical-lr; transform: rotate(180deg); 
+            background-color: #252525; font-weight: 600; letter-spacing: 1px; color: #777; font-size: 0.7em; 
+        }
+
+        .btn-container { margin-top: 10px; display: flex; gap: 8px; }
+        .inner-btn { 
+            padding: 4px 10px; border: 1px solid #333; border-radius: 3px; background: #252525;
+            font-weight: 500; cursor: pointer; color: #ccc; font-size: 0.8em; 
+        }
+        .inner-btn:hover { background: #333; color: #fff; }
+
+        .btn-refresh-rates {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            color: #333;
+            cursor: pointer;
+            font-size: 16px;
+            width: 32px;
+            height: 32px;
+            margin-top: 18px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-refresh-rates:hover {
+            background: #e0e0e0;
+            border-color: #999;
+        }
+        .btn-refresh-rates:active {
+            transform: scale(0.95);
+        }
+        .btn-refresh-rates:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .total-section { 
+            margin-top: 15px; padding: 15px; background-color: #1a1f1a; 
+            border: 1px solid #1e3a20; text-align: right; border-radius: 4px; 
+        }
+        .total-display { font-size: 1.6em; font-weight: 600; color: var(--accent-green); }
+
+        /* Ensure Other Fees section is always visible */
+        .other-fees-body { display: table-row-group !important; }
+        .other-row { display: table-row !important; }
+        .other-fees-body .hide-on-print { display: table-row !important; }
+        .sidebar-cell { display: table-cell !important; visibility: visible !important; }
+        .other-fees-body.hide-on-print { display: none !important; }
+
+
+        /* =========================================
+           PRINT CSS
+           ========================================= */
+        @media print {
+            @page {
+                margin: 5mm; 
+                size: portrait; /* DEFAULT to Portrait */
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            body {
+                background-color: #fff !important;
+                color: #000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                font-family: Arial, Helvetica, sans-serif !important;
+            }
+
+            /* Hide UI Elements */
+            .sidebar, .top-bar, .btn-close-card, .btn-container, .exchange-section, .btn-add-folder, .btn-refresh-rates {
+                display: none !important;
+            }
+            .hide-on-print {
+                display: none !important;
+            }
+
+            /* Layout Container */
+            .layout-container, .main-content {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                background: #fff !important;
+            }
+
+            /* --- HEADER (FIXED VISIBILITY) --- */
+            #print-header {
+                display: block !important; /* Force Display */
+                text-align: center;
+                margin-bottom: 20px;
+                border-bottom: 3px solid #000;
+                padding-bottom: 10px;
+                width: 100%;
+                page-break-after: avoid;
+                background: #fff !important;
+            }
+            #print-folder-name {
+                font-size: 26px;
+                font-weight: 900;
+                text-transform: uppercase;
+                color: #000 !important; /* Force Black */
+                visibility: visible !important;
+                background: #fff !important;
+                padding: 10px;
+            }
+
+            /* --- CALCULATOR CARD STYLING --- */
+            .calculator-card {
+                background: #fff !important;
+                border: 2px solid #000 !important;
+                color: #000 !important;
+                padding: 8px !important;
+                margin-bottom: 15px !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                display: block !important;
+                position: relative !important;
+            }
+            
+            /* Remove any dark backgrounds from cards */
+            .calculator-card * {
+                background: transparent !important;
+            }
+
+            /* Input Styling for Print */
+            input, select, .calc-input, .table-input, .header-box input {
+                background: transparent !important;
+                color: #000 !important;
+                border: none !important;
+                border-bottom: 1px dotted #888 !important;
+                font-weight: 600 !important;
+                font-size: 10px !important;
+                padding: 0 !important;
+                height: auto !important;
+                box-shadow: none !important;
+            }
+            select { -webkit-appearance: none; appearance: none; }
+            input[type=number]::-webkit-inner-spin-button { display: none; }
+
+            /* Internal Table Styling */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                border: 1px solid #000;
+                font-size: 9px !important;
+                table-layout: fixed !important;
+            }
+            th, td {
+                border: 1px solid #000 !important;
+                padding: 3px !important;
+                color: #000 !important;
+            }
+            .th-header, .bg-unit, .bg-sub, .vertical-text {
+                background-color: #e0e0e0 !important;
+                color: #000 !important;
+                font-weight: bold;
+                text-shadow: none !important;
+            }
+            .vertical-text { 
+                writing-mode: vertical-lr; 
+                transform: rotate(180deg);
+                text-align: center;
+                white-space: nowrap;
+                width: 20px;
+            }
+
+            /* Header Box (Transporter) */
+            .header-box {
+                background: #f0f0f0 !important;
+                border: 1px solid #000 !important;
+                border-left: 4px solid #000 !important;
+                margin-bottom: 8px;
+                padding: 4px 8px;
+            }
+            .header-box label { 
+                color: #000 !important;
+                background: transparent !important;
+            }
+            .controls-wrapper {
+                background: none !important;
+                border: none !important;
+                padding: 0 0 5px 0 !important;
+                margin: 0 !important;
+            }
+            .control-group label { color: #000 !important; font-weight: bold !important;}
+
+            .total-section {
+                background: none !important;
+                border: 3px solid #000 !important;
+                color: #000 !important;
+                margin-top: 8px !important;
+                padding: 8px 15px !important;
+                font-weight: bold !important;
+                text-align: right !important;
+            }
+            .total-display, .rf-display, .taxe-regionale-display { 
+                color: #000 !important;
+                font-weight: 900 !important;
+                font-size: 1.2em !important;
+            }
+            .total-section span {
+                color: #000 !important;
+                font-weight: bold !important;
+            }
+
+            
+            /* --- SINGLE MODE (PORTRAIT) --- */
+            body.print-single-mode #app-grid {
+                display: block !important;
+                max-width: 170mm !important; /* Same width as multi-card */
+                margin: 0 auto !important;
+                min-height: auto !important; /* Remove fixed height */
+                height: auto !important; /* Natural height */
+            }
+            body.print-single-mode .calculator-card {
+                min-height: auto !important; /* Remove fixed height */
+                height: auto !important; /* Natural height */
+                max-height: 200mm !important; /* Reasonable maximum */
+                display: block !important;
+                margin: 0 auto !important;
+            }
+            body.print-single-mode .calculator-card table {
+                flex: none !important; /* Remove flex stretching */
+                height: auto !important;
+            }
+            body.print-single-mode .calculator-card table tbody {
+                height: auto !important; /* Natural height */
+            }
+            
+            /* --- GRID MODE (HYBRID) --- */
+            /* Single column for 1-2 cards, 2x2 grid for 3-4 cards */
+            
+            body.print-grid-mode #app-grid {
+                display: grid !important;
+                grid-template-columns: 1fr !important; /* Default single column */
+                gap: 6px !important; /* Reduced gap */
+                width: 100% !important;
+                max-width: 190mm !important; /* Increased to use more page width */
+                min-height: auto !important;
+                height: auto !important; /* Dynamic height */
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                padding: 3mm !important; /* Reduced padding for more space */
+                margin: 0 auto !important;
+                box-sizing: border-box !important;
+            }
+            /* When there are 3+ cards, switch to 2-column layout */
+            body.print-grid-mode.has-3-cards #app-grid,
+            body.print-grid-mode.has-4-cards #app-grid,
+            body.print-grid-mode.has-many-cards #app-grid {
+                grid-template-columns: 1fr 1fr !important; /* 2 columns */
+                max-width: 190mm !important; /* Increased to use more page width */
+                gap: 6px !important; /* Consistent gap between columns */
+            }
+            body.print-grid-mode .calculator-card {
+                min-height: 120mm !important; /* Increased height to use more page space */
+                height: auto !important; /* Natural height but constrained */
+                max-height: 130mm !important; /* Increased maximum height */
+                padding: 4px !important; /* Reduced padding */
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                margin: 0 1mm !important; /* Small margins to prevent overflow */
+                overflow: hidden !important; /* Prevent overflow */
+                box-sizing: border-box !important;
+                width: 100% !important;
+            }
+            /* Smaller cards when in 2-column mode */
+            body.print-grid-mode.has-3-cards .calculator-card,
+            body.print-grid-mode.has-4-cards .calculator-card {
+                min-height: 120mm !important; /* Increased height to use more page space */
+                max-height: 130mm !important; /* Increased maximum height */
+                padding: 3px !important; /* Minimal padding */
+                margin: 0 1mm !important; /* Consistent margins */
+                overflow: hidden !important; /* Prevent overflow */
+                box-sizing: border-box !important;
+                width: 100% !important;
+            }
+            /* Even smaller cards for 5+ cards to fit more per page */
+            body.print-grid-mode.has-many-cards .calculator-card {
+                min-height: 100mm !important; /* Still smaller for many cards */
+                max-height: 110mm !important; /* Reduced maximum height */
+                padding: 2px !important; /* Minimal padding */
+                margin: 0 1mm !important; /* Consistent margins */
+                overflow: hidden !important; /* Prevent overflow */
+                box-sizing: border-box !important;
+                width: 100% !important;
+            }
+            body.print-grid-mode .calculator-card table {
+                font-size: 10px !important; /* Increased font size for better readability */
+                line-height: 1.3 !important; /* Slightly tighter line height */
+            }
+            body.print-grid-mode .calculator-card th, 
+            body.print-grid-mode .calculator-card td {
+                padding: 2px !important; /* Reduced padding for more rows */
+                font-size: 9px !important; /* Increased font for better readability */
+                line-height: 1.2 !important; /* Tighter line height */
+            }
+            /* Other fees section optimization */
+            body.print-grid-mode .other-row td {
+                padding: 1px !important; /* Minimal padding for other fees */
+                font-size: 8px !important; /* Increased font for other fees */
+                line-height: 1.1 !important; /* Minimal line height */
+            }
+            body.print-grid-mode .other-row input {
+                font-size: 8px !important;
+                padding: 0px !important;
+                height: 10px !important;
+            }
+            body.print-grid-mode .other-row select {
+                font-size: 8px !important;
+                padding: 0px !important;
+                height: 10px !important;
+            }
+            body.print-grid-mode .calculator-card input,
+            body.print-grid-mode .calculator-card select {
+                font-size: 9px !important; /* Increased font size */
+                padding: 1px !important; /* Minimal padding */
+                height: 12px !important; /* Increased height */
+            }
+            body.print-grid-mode .header-box {
+                padding: 3px 5px !important; /* Slightly more padding */
+                margin-bottom: 3px !important; /* Slightly more margin */
+            }
+            body.print-grid-mode .header-box label {
+                font-size: 9px !important; /* Increased font */
+            }
+            body.print-grid-mode .controls-wrapper {
+                padding: 3px !important; /* Slightly more padding */
+                margin-bottom: 3px !important; /* Slightly more margin */
+            }
+            body.print-grid-mode .control-group label {
+                font-size: 8px !important; /* Increased font */
+            }
+            body.print-grid-mode .calc-input {
+                font-size: 9px !important; /* Increased font size */
+                padding: 1px !important; /* Minimal padding */
+                height: 12px !important; /* Increased height */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout-container">
+    
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+        <div class="brand">
+            <span>📦 LOGISTIQUE PRO</span>
+            <div style="margin-top: 10px; font-size: 0.8em; color: #888;">
+                <span id="user-display">Utilisateur</span>
+                <button onclick="logout()" style="background: none; border: 1px solid #666; color: #ccc; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-left: 10px; font-size: 0.8em;">
+                    Déconnexion
+                </button>
+            </div>
+        </div>
+        <ul class="folder-list" id="folder-list"></ul>
+        <button class="btn-add-folder" onclick="createNewFolder()">+ Nouveau Dossier</button>
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
+            <h4 style="color: #ccc; font-size: 0.9em; margin-bottom: 10px;">Sessions sauvegardées</h4>
+            <ul class="folder-list" id="saved-sessions" style="max-height: 200px; overflow-y: auto;"></ul>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Print Header -->
+        <div id="print-header">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="text-align: left;">
+                    <div id="print-folder-name" style="font-size: 26px; font-weight: 900; text-transform: uppercase; color: #000 !important;">DOSSIER</div>
+                </div>
+                <div style="text-align: right;">
+                    <div id="print-payment-method" style="font-size: 14px; font-weight: bold; color: #000 !important;"></div>
+                    <div id="print-date" style="font-size: 12px; color: #000 !important;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-bar">
+            <div class="title-wrapper">
+                <h2 class="current-folder-title" id="folder-title">Dossier</h2>
+                <button class="btn-edit-title" onclick="renameCurrentFolder()" title="Renommer">✏️</button>
+                <div class="payment-method-selector">
+                    <label for="payment-method">Méthode de paiement:</label>
+                    <select id="payment-method" class="payment-select" onchange="updatePaymentMethod()">
+                        <option value="">-- Choisir --</option>
+                        <option value="CAD">CAD</option>
+                        <option value="LIBRE">LIBRE</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="top-buttons">
+                <button class="btn-action btn-new-calc" onclick="addCalculator()">
+                    <span style="font-size:1.2em; line-height:1;">+</span> Ajouter
+                </button>
+                <button class="btn-action btn-print" onclick="printDoc()">
+                    <span>🖨️</span> Imprimer
+                </button>
+                <button class="btn-action btn-pdf" onclick="generateVectorPDF()">
+                    <span>📥</span> PDF
+                </button>
+                <button class="btn-action" onclick="saveSession()" style="border-color: var(--accent-green); color: var(--accent-green);">
+                    <span>💾</span> Sauvegarder
+                </button>
+            </div>
+        </div>
+
+        <div id="app-grid" class="single-mode">
+            <!-- Calculators -->
+        </div>
+    </main>
+
+</div>
+
+<script>
+    // --- STATE MANAGEMENT ---
+    let appData = {
+        folders: [ { id: 'default', name: 'Général', calculators: [] } ],
+        activeFolderId: 'default'
+    };
+
+    let currentUser = null;
+    let savedSessions = [];
+    let calcCounter = 0;
+
+    // --- INIT ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadCurrentUser();
+        await loadSavedSessions();
+        renderSidebar();
+        loadActiveFolder();
+        
+        // Ensure Other Fees section is always visible
+        setTimeout(() => {
+            document.querySelectorAll('.other-row').forEach(row => {
+                row.classList.remove('hide-on-print');
+                row.style.display = 'table-row';
+            });
+            document.querySelectorAll('.other-fees-body').forEach(body => {
+                body.style.display = 'table-row-group';
+            });
+            document.querySelectorAll('.sidebar-cell').forEach(cell => {
+                cell.style.display = 'table-cell';
+                cell.style.visibility = 'visible';
+            });
+        }, 100);
+    });
+
+    // --- USER MANAGEMENT ---
+    async function loadCurrentUser() {
+        try {
+            const response = await fetch('/api/user');
+            if (response.ok) {
+                const data = await response.json();
+                currentUser = data;
+                document.getElementById('user-display').textContent = data.username;
+            } else {
+                // If not authenticated, server will handle redirect
+                console.error('User not authenticated');
+            }
+        } catch (error) {
+            console.error('Error loading user:', error);
+        }
+    }
+
+    async function logout() {
+        try {
+            const response = await fetch('/api/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                window.location.href = '/';
+            }
+        } catch (error) {
+            console.error('Error during logout:', error);
+        }
+    }
+
+    // --- SESSION MANAGEMENT ---
+    async function loadSavedSessions() {
+        try {
+            const response = await fetch('/api/sessions');
+            if (response.ok) {
+                const data = await response.json();
+                savedSessions = data.sessions;
+                renderSavedSessions();
+            }
+        } catch (error) {
+            console.error('Error loading sessions:', error);
+        }
+    }
+
+    function renderSavedSessions() {
+        const list = document.getElementById('saved-sessions');
+        list.innerHTML = '';
+        
+        if (savedSessions.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'folder-item';
+            li.style.color = '#666';
+            li.style.fontSize = '0.8em';
+            li.innerText = 'Aucune session sauvegardée';
+            list.appendChild(li);
+            return;
+        }
+        
+        savedSessions.forEach(session => {
+            const li = document.createElement('li');
+            li.className = 'folder-item';
+            li.style.cursor = 'pointer';
+            
+            const span = document.createElement('span');
+            span.innerText = session.session_name;
+            span.style.flex = '1';
+            li.appendChild(span);
+            
+            const loadBtn = document.createElement('button');
+            loadBtn.innerHTML = '📂';
+            loadBtn.title = 'Charger cette session';
+            loadBtn.style.cssText = 'background: none; border: none; color: #4CAF50; cursor: pointer; font-size: 1em; margin-right: 5px;';
+            loadBtn.onclick = (e) => {
+                e.stopPropagation();
+                loadSession(session.id);
+            };
+            li.appendChild(loadBtn);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '🗑️';
+            deleteBtn.title = 'Supprimer cette session';
+            deleteBtn.style.cssText = 'background: none; border: none; color: #f44336; cursor: pointer; font-size: 1em;';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteSession(session.id);
+            };
+            li.appendChild(deleteBtn);
+            
+            list.appendChild(li);
+        });
+    }
+
+    async function saveSession() {
+        const sessionName = prompt('Nom de la session à sauvegarder:');
+        if (!sessionName) return;
+        
+        saveCurrentState();
+        
+        try {
+            const response = await fetch('/api/sessions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sessionName: sessionName,
+                    sessionData: appData
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                alert('Session sauvegardée avec succès!');
+                await loadSavedSessions();
+            } else {
+                const error = await response.json();
+                alert('Erreur: ' + error.error);
+            }
+        } catch (error) {
+            console.error('Error saving session:', error);
+            alert('Erreur lors de la sauvegarde');
+        }
+    }
+
+    async function loadSession(sessionId) {
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}`);
+            if (response.ok) {
+                const data = await response.json();
+                appData = data.sessionData;
+                renderSidebar();
+                loadActiveFolder();
+                alert('Session chargée avec succès!');
+            } else {
+                const error = await response.json();
+                alert('Erreur: ' + error.error);
+            }
+        } catch (error) {
+            console.error('Error loading session:', error);
+            alert('Erreur lors du chargement');
+        }
+    }
+
+    async function deleteSession(sessionId) {
+        if (!confirm('Supprimer cette session sauvegardée?')) return;
+        
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                await loadSavedSessions();
+                alert('Session supprimée avec succès!');
+            } else {
+                const error = await response.json();
+                alert('Erreur: ' + error.error);
+            }
+        } catch (error) {
+            console.error('Error deleting session:', error);
+            alert('Erreur lors de la suppression');
+        }
+    }
+
+    // --- SIDEBAR & FOLDERS ---
+    function renderSidebar() {
+        const list = document.getElementById('folder-list');
+        list.innerHTML = '';
+        appData.folders.forEach(folder => {
+            const li = document.createElement('li');
+            li.className = `folder-item ${folder.id === appData.activeFolderId ? 'active' : ''}`;
+            li.onclick = () => switchFolder(folder.id);
+            
+            const span = document.createElement('span');
+            span.innerText = folder.name;
+            li.appendChild(span);
+
+            if(appData.folders.length > 1) {
+                const btn = document.createElement('button');
+                btn.className = 'delete-folder-btn';
+                btn.innerHTML = '×';
+                btn.title = 'Supprimer';
+                btn.onclick = (e) => { e.stopPropagation(); deleteFolder(folder.id); };
+                li.appendChild(btn);
+            }
+            list.appendChild(li);
+        });
+        
+        const currentFolder = appData.folders.find(f => f.id === appData.activeFolderId);
+        document.getElementById('folder-title').innerText = currentFolder.name;
+        // Ensure Print Header is synced
+        document.getElementById('print-folder-name').innerText = currentFolder.name;
+    }
+
+    function createNewFolder() {
+        const name = prompt("Nom du nouveau dossier (ex: Fournisseur Chine):");
+        if(name) {
+            saveCurrentState(); 
+            const newId = 'folder_' + Date.now();
+            appData.folders.push({ id: newId, name: name, calculators: [] });
+            switchFolder(newId);
+        }
+    }
+
+    function renameCurrentFolder() {
+        const currentFolder = appData.folders.find(f => f.id === appData.activeFolderId);
+        const newName = prompt("Nouveau nom du dossier :", currentFolder.name);
+        if (newName && newName.trim() !== "") {
+            currentFolder.name = newName;
+            renderSidebar(); 
+        }
+    }
+
+    function deleteFolder(id) {
+        if(confirm("Supprimer ce dossier et ses calculs ?")) {
+            appData.folders = appData.folders.filter(f => f.id !== id);
+            if(appData.activeFolderId === id) {
+                appData.activeFolderId = appData.folders[0].id;
+            }
+            renderSidebar();
+            loadActiveFolder();
+        }
+    }
+
+    function switchFolder(id) {
+        if(id === appData.activeFolderId) return;
+        saveCurrentState(); 
+        appData.activeFolderId = id;
+        renderSidebar();
+        loadActiveFolder(); 
+    }
+
+    // --- DATA HANDLING ---
+    function saveCurrentState() {
+        const currentFolder = appData.folders.find(f => f.id === appData.activeFolderId);
+        currentFolder.calculators = []; 
+
+        const cards = document.querySelectorAll('.calculator-card');
+        cards.forEach(card => {
+            const getRadioVal = (namePrefix) => {
+                const radios = card.querySelectorAll(`input[name^="${namePrefix}"]`);
+                return radios[1].checked ? 'bl' : 'tc';
+            };
+
+            const otherRows = [];
+            card.querySelectorAll('.other-row').forEach(row => {
+                let isBl = row.querySelector('input[type="radio"][value="bl"]').checked;
+                otherRows.push({
+                    desc: row.querySelector('.other-desc').value,
+                    val: row.querySelector('.other-val').value,
+                    cur: row.querySelector('.other-cur').value,
+                    unit: isBl ? 'bl' : 'tc'
+                });
+            });
+
+            currentFolder.calculators.push({
+                transporter: card.querySelector('.transporter-name').value,
+                nb: card.querySelector('.nb-containers').value,
+                type: card.querySelector('.tc-type').value,
+                usd: card.querySelector('.rate-usd').value,
+                eur: card.querySelector('.rate-eur').value,
+                fret: {
+                    val: card.querySelector('.fret-val').value,
+                    cur: card.querySelector('.fret-cur').value,
+                    unit: getRadioVal(`fret_${card.id}`)
+                },
+                local: {
+                    val: card.querySelector('.local-val').value,
+                    cur: card.querySelector('.local-cur').value,
+                    unit: getRadioVal(`local_${card.id}`)
+                },
+                rf: card.querySelector('.rf-percent').value,
+                taxeRegionale: card.querySelector('.taxe-regionale-val').value,
+                franchise: card.querySelector('.franchise-val').value,
+                transit: card.querySelector('.transit-val').value,
+                others: otherRows
+            });
+        });
+        // Note: Data is now saved when user explicitly saves a session
+    }
+
+    function loadActiveFolder() {
+        const grid = document.getElementById('app-grid');
+        grid.innerHTML = '';
+        calcCounter = 0; 
+        
+        const folder = appData.folders.find(f => f.id === appData.activeFolderId);
+        
+        // Sync Print Header
+        document.getElementById('print-folder-name').innerText = folder.name;
+        
+        // Load payment method
+        loadPaymentMethod();
+
+        if(folder.calculators.length === 0) {
+            addCalculator(); 
+        } else {
+            folder.calculators.forEach(data => addCalculator(data));
+        }
+        updateLayout();
+    }
+
+
+    // --- DOM GENERATION ---
+    function updateLayout() {
+        const grid = document.getElementById('app-grid');
+        grid.className = grid.children.length <= 1 ? 'single-mode' : 'grid-mode';
+    }
+
+    function addCalculator(data = null) {
+        calcCounter++;
+        const uniqueId = `calc_${Date.now()}_${calcCounter}`;
+        
+        const card = document.createElement('div');
+        card.className = 'calculator-card';
+        card.id = uniqueId;
+        card.dataset.feeRows = 1; 
+
+        card.innerHTML = `
+            <button class="btn-close-card" onclick="removeCalculator('${uniqueId}')" title="Supprimer">×</button>
+
+            <!-- Header -->
+            <div class="header-box">
+                <label>TRANSPORTEUR :</label>
+                <input type="text" class="transporter-name" placeholder="...">
+            </div>
+
+            <!-- Settings -->
+            <div class="controls-wrapper">
+                <div style="display:flex; gap:15px;">
+                    <div class="control-group">
+                        <label>Qté</label>
+                        <input type="number" class="calc-input small-input nb-containers" value="1" min="1" oninput="triggerCalc('${uniqueId}')" onchange="triggerCalc('${uniqueId}')">
+                    </div>
+                    <div class="control-group">
+                        <label>Type TC</label>
+                        <select class="calc-input med-input tc-type" onchange="triggerCalc('${uniqueId}')">
+                            <option value="20">20' TC</option>
+                            <option value="40hc">40' HC</option>
+                            <option value="40hcpw">40' HCPW</option>
+                            <option value="45hcpw">45' HCPW</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="exchange-section" style="display:flex; gap:10px; align-items: center;">
+                    <div class="control-group">
+                        <label>USD ($)</label>
+                        <input type="number" class="calc-input small-input rate-usd" value="10.00" step="0.01" oninput="triggerCalc('${uniqueId}')" readonly>
+                    </div>
+                    <div class="control-group">
+                        <label>EUR (€)</label>
+                        <input type="number" class="calc-input small-input rate-eur" value="11.00" step="0.01" oninput="triggerCalc('${uniqueId}')" readonly>
+                    </div>
+                    <button type="button" class="btn-refresh-rates" onclick="refreshRates('${uniqueId}')" title="Refresh exchange rates">
+                        ↻
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <table>
+                <colgroup>
+                    <col class="col-sidebar" style="width:25px;">
+                    <col class="col-desc">
+                    <col class="col-amount">
+                    <col class="col-devise">
+                    <col class="col-tc">
+                    <col class="col-bl">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th colspan="2" style="border:none;"></th>
+                        <th class="th-header">VALEUR</th>
+                        <th class="th-header">DEVISE</th>
+                        <th colspan="2" class="th-header bg-unit">UNITE</th>
+                    </tr>
+                    <tr>
+                        <th colspan="2" class="th-header" style="text-align:left; padding-left:15px;">DESCRIPTION</th>
+                        <th class="th-header"></th>
+                        <th class="th-header"></th>
+                        <th class="th-header">TC</th>
+                        <th class="th-header">BL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="2" style="text-align:left; font-weight:bold;">FRET</td>
+                        <td><input type="number" class="table-input calc-input fret-val" placeholder="0.00" oninput="triggerCalc('${uniqueId}')"></td>
+                        <td>
+                            <select class="table-select calc-input fret-cur" onchange="triggerCalc('${uniqueId}')">
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="MAD">MAD</option>
+                            </select>
+                        </td>
+                        <td><input type="radio" name="fret_${uniqueId}" value="tc" checked onchange="triggerCalc('${uniqueId}')"></td>
+                        <td><input type="radio" name="fret_${uniqueId}" value="bl" onchange="triggerCalc('${uniqueId}')"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align:left; font-weight:bold;">FRAIS LOCAUX</td>
+                        <td><input type="number" class="table-input calc-input local-val" placeholder="0.00" oninput="triggerCalc('${uniqueId}')"></td>
+                        <td>
+                            <select class="table-select calc-input local-cur" onchange="triggerCalc('${uniqueId}')">
+                                <option value="MAD">MAD</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </td>
+                        <td><input type="radio" name="local_${uniqueId}" value="tc" checked onchange="triggerCalc('${uniqueId}')"></td>
+                        <td><input type="radio" name="local_${uniqueId}" value="bl" onchange="triggerCalc('${uniqueId}')"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align:left; font-weight:bold;">RETOUR DE FOND</td>
+                        <td><input type="number" class="table-input calc-input rf-percent" placeholder="%" oninput="triggerCalc('${uniqueId}')"></td>
+                        <td style="font-weight:bold;">%</td>
+                        <td colspan="2" class="bg-sub"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align:left; font-weight:bold;">TAXE RÉGIONALE</td>
+                        <td>
+                            <select class="table-select taxe-regionale-val" onchange="triggerCalc('${uniqueId}')">
+                                <option value="non">Non</option>
+                                <option value="oui">Oui</option>
+                            </select>
+                        </td>
+                        <td style="font-weight:bold;">-</td>
+                        <td colspan="2" class="bg-sub"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align:left; font-weight:bold;">FRANCHISE</td>
+                        <td>
+                            <select class="table-select franchise-val">
+                                <option value="">-</option>
+                                <option value="7">7</option>
+                                <option value="14">14</option>
+                                <option value="21">21</option>
+                            </select>
+                        </td>
+                        <td style="font-weight:bold;">JR</td>
+                        <td colspan="2" class="bg-sub"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align:left; font-weight:bold;">TRANSIT TIME</td>
+                        <td>
+                            <input type="number" class="table-input transit-val" placeholder="jours" oninput="triggerCalc(this.id)">
+                        </td>
+                        <td style="font-weight:bold;">JR</td>
+                        <td colspan="2" class="bg-sub"></td>
+                    </tr>
+                </tbody>
+
+                <tbody class="other-fees-body">
+                    <tr class="other-row" data-idx="1">
+                        <td rowspan="1" class="sidebar-cell vertical-text">AUTRES FRAIS</td>
+                        <td><input type="text" class="table-input other-desc" placeholder="Ex: Dossier"></td>
+                        <td><input type="number" class="table-input calc-input other-val" placeholder="0.00" oninput="triggerCalc('${uniqueId}')"></td>
+                        <td>
+                            <select class="table-select calc-input other-cur" onchange="triggerCalc('${uniqueId}')">
+                                <option value="MAD">MAD</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </td>
+                        <td><input type="radio" name="other_${uniqueId}_1" value="tc" checked onchange="triggerCalc('${uniqueId}')"></td>
+                        <td><input type="radio" name="other_${uniqueId}_1" value="bl" onchange="triggerCalc('${uniqueId}')"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="btn-container">
+                <button class="inner-btn" onclick="addFeeRow('${uniqueId}')">+ Ligne</button>
+                <button class="inner-btn" onclick="removeFeeRow('${uniqueId}')">- Ligne</button>
+            </div>
+
+            <div class="total-section">
+                <div>
+                    <span style="color:#bbb; font-size:1em;">TOTAL (DH):</span>
+                    <span class="total-display">0.00 DH</span>
+                </div>
+                <div style="margin-top:5px; font-size:0.8em; color:#666;">
+                    (Dont RF : <span class="rf-display">0.00</span> DH)
+                </div>
+                <div style="margin-top:5px; font-size:0.8em; color:#666;">
+                    (Dont Taxe Régionale : <span class="taxe-regionale-display">0.00</span> DH)
+                </div>
+            </div>
+        `;
+
+        document.getElementById('app-grid').appendChild(card);
+        if(data) populateCardData(card, data, uniqueId);
+        updateLayout();
+        
+        // Auto-refresh rates for new card
+        setTimeout(() => {
+            refreshRates(uniqueId);
+        }, 500);
+    }
+
+    function removeCalculator(id) {
+        if(confirm("Supprimer ce calcul ?")) {
+            document.getElementById(id).remove();
+            updateLayout();
+            // Auto-save is removed - user must explicitly save sessions
+        }
+    }
+
+    function addFeeRow(id, rowData = null) {
+        const card = document.getElementById(id);
+        const tbody = card.querySelector('.other-fees-body');
+        
+        // Vérifier combien de lignes existent déjà
+        const rows = tbody.querySelectorAll('tr');
+        const isFirstRow = rows.length === 0;
+        
+        // Générer un ID unique pour les boutons radio (évite les conflits)
+        const uniqueRowId = Date.now() + Math.floor(Math.random() * 1000); 
+
+        const tr = document.createElement('tr');
+        tr.className = 'other-row';
+        tr.dataset.idx = rows.length + 1;
+
+        // Construction du HTML
+        let htmlContent = '';
+
+        // SI c'est la première ligne (cas du chargement ou reset), on recrée la cellule "AUTRES FRAIS"
+        if (isFirstRow) {
+            htmlContent += `<td rowspan="1" class="sidebar-cell vertical-text">AUTRES FRAIS</td>`;
+        } else {
+            // SI ce n'est pas la première ligne, on met à jour le rowspan de la cellule existante
+            const sidebar = card.querySelector('.sidebar-cell');
+            if (sidebar) {
+                sidebar.rowSpan = rows.length + 1;
+            }
+        }
+
+        // Ajout des champs de saisie standards
+        htmlContent += `
+            <td><input type="text" class="table-input other-desc" placeholder="Autre..."></td>
+            <td><input type="number" class="table-input calc-input other-val" placeholder="0.00" oninput="triggerCalc('${id}')"></td>
+            <td>
+                <select class="table-select calc-input other-cur" onchange="triggerCalc('${id}')">
+                    <option value="MAD">MAD</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                </select>
+            </td>
+            <td><input type="radio" name="other_${id}_${uniqueRowId}" value="tc" checked onchange="triggerCalc('${id}')"></td>
+            <td><input type="radio" name="other_${id}_${uniqueRowId}" value="bl" onchange="triggerCalc('${id}')"></td>
+        `;
+
+        tr.innerHTML = htmlContent;
+        tbody.appendChild(tr);
+
+        // Remplissage des données (si on charge une sauvegarde)
+        if(rowData) {
+            tr.querySelector('.other-desc').value = rowData.desc || '';
+            tr.querySelector('.other-val').value = rowData.val || '';
+            tr.querySelector('.other-cur').value = rowData.cur || 'MAD';
+            if(rowData.unit === 'bl') tr.querySelectorAll('input[type="radio"]')[1].checked = true;
+        }
+    }
+
+    function removeFeeRow(id) {
+        const card = document.getElementById(id);
+        const tbody = card.querySelector('.other-fees-body');
+        const sidebar = card.querySelector('.sidebar-cell');
+        const rows = tbody.querySelectorAll('tr');
+
+        if (rows.length > 1) {
+            tbody.removeChild(rows[rows.length - 1]);
+            sidebar.rowSpan = rows.length - 1;
+            calculateInstance(card);
+            // Auto-save is removed - user must explicitly save sessions
+        }
+    }
+
+    function triggerCalc(id) {
+        calculateInstance(document.getElementById(id));
+        // Auto-save is removed - user must explicitly save sessions
+    }
+
+    // Currency Exchange API Integration
+    async function refreshRates(cardId) {
+        const card = document.getElementById(cardId);
+        const usdInput = card.querySelector('.rate-usd');
+        const eurInput = card.querySelector('.rate-eur');
+        const refreshBtn = card.querySelector('.btn-refresh-rates');
+        
+        // Show loading state
+        refreshBtn.textContent = '⟳';
+        refreshBtn.style.animation = 'spin 1s linear infinite';
+        refreshBtn.disabled = true;
+        
+        try {
+            // Using free exchangerate-api.com (no API key required)
+            const response = await fetch('https://api.exchangerate-api.com/v4/latest/MAD');
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch exchange rates');
+            }
+            
+            const data = await response.json();
+            
+            // Update rates (MAD to USD and EUR)
+            const usdRate = data.rates.USD;
+            const eurRate = data.rates.EUR;
+            
+            // Convert to MAD rates (1 USD = ? MAD, 1 EUR = ? MAD)
+            usdInput.value = (1 / usdRate).toFixed(4);
+            eurInput.value = (1 / eurRate).toFixed(4);
+            
+            // Trigger recalculation
+            triggerCalc(cardId);
+            
+            // Show success state
+            refreshBtn.style.animation = 'none';
+            refreshBtn.textContent = '✓';
+            refreshBtn.style.color = '#4CAF50';
+            setTimeout(() => {
+                refreshBtn.textContent = '↻';
+                refreshBtn.style.color = '#333';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error fetching exchange rates:', error);
+            
+            // Show error state
+            refreshBtn.style.animation = 'none';
+            refreshBtn.textContent = '✗';
+            refreshBtn.style.color = '#f44336';
+            setTimeout(() => {
+                refreshBtn.textContent = '↻';
+                refreshBtn.style.color = '#333';
+            }, 2000);
+            
+            // Optionally show user-friendly message
+            alert('Failed to fetch exchange rates. Please check your internet connection.');
+        } finally {
+            refreshBtn.disabled = false;
+        }
+    }
+
+    // Auto-refresh rates when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Refresh rates for all existing cards after a short delay
+        setTimeout(() => {
+            document.querySelectorAll('.calculator-card').forEach(card => {
+                const cardId = card.id;
+                refreshRates(cardId);
+            });
+        }, 1000);
+    });
+
+    function calculateInstance(card) {
+        let nbTC = parseFloat(card.querySelector('.nb-containers').value) || 1;
+        let rateUSD = parseFloat(card.querySelector('.rate-usd').value) || 1;
+        let rateEUR = parseFloat(card.querySelector('.rate-eur').value) || 1;
+        let grandTotalMAD = 0;
+
+        function getMADValue(amount, currency) {
+            if (currency === 'USD') return amount * rateUSD;
+            if (currency === 'EUR') return amount * rateEUR;
+            return amount; 
+        }
+
+        // Fret
+        let fretVal = parseFloat(card.querySelector('.fret-val').value) || 0;
+        let fretCur = card.querySelector('.fret-cur').value;
+        let fretUnitMAD = getMADValue(fretVal, fretCur);
+        let isFretPerTC = !card.querySelectorAll(`input[name^="fret_"]`)[1].checked;
+        let fretTotalMAD = isFretPerTC ? (fretUnitMAD * nbTC) : fretUnitMAD;
+        grandTotalMAD += fretTotalMAD;
+
+        // Local
+        let localVal = parseFloat(card.querySelector('.local-val').value) || 0;
+        let localCur = card.querySelector('.local-cur').value;
+        let localUnitMAD = getMADValue(localVal, localCur);
+        let isLocalPerTC = !card.querySelectorAll(`input[name^="local_"]`)[1].checked;
+        let localTotalMAD = isLocalPerTC ? (localUnitMAD * nbTC) : localUnitMAD;
+        grandTotalMAD += localTotalMAD;
+
+        // RF
+        let rfPercent = parseFloat(card.querySelector('.rf-percent').value) || 0;
+        let rfTotalMAD = fretTotalMAD * (rfPercent / 100);
+        grandTotalMAD += rfTotalMAD;
+        card.querySelector('.rf-display').innerText = rfTotalMAD.toLocaleString('fr-MA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        // Other
+        let rows = card.querySelectorAll('.other-row');
+        let otherTotalMAD = 0;
+        rows.forEach(row => {
+            let valInput = row.querySelector('.other-val');
+            let curSelect = row.querySelector('.other-cur');
+            let val = parseFloat(valInput.value) || 0;
+            if (val > 0) {
+                let cur = curSelect.value;
+                let valMAD = getMADValue(val, cur);
+                let radioBL = row.querySelector('input[type="radio"][value="bl"]');
+                let isPerTC = !radioBL.checked;
+                let rowTotal = isPerTC ? (valMAD * nbTC) : valMAD;
+                otherTotalMAD += rowTotal;
+                grandTotalMAD += rowTotal;
+            }
+        });
+
+        // Taxe Régionale (calculated after Other fees)
+        let taxeRegionaleMAD = 0;
+        const taxeRegionaleSelect = card.querySelector('.taxe-regionale-val');
+        if (taxeRegionaleSelect.value === 'oui') {
+            // Calculate: 20 MAD + 3% of (RF per TC + RL per TC + 300) per TC, then multiply by nbTC
+            // Handle BL vs TC correctly
+            const rfIsBL = card.querySelectorAll(`input[name^="fret_"]`)[1].checked;
+            const localIsBL = card.querySelectorAll(`input[name^="local_"]`)[1].checked;
+            
+            const rfPerTC = rfIsBL ? rfTotalMAD / nbTC : rfTotalMAD / nbTC; // RF per TC
+            const localPerTC = localIsBL ? localTotalMAD / nbTC : localTotalMAD / nbTC; // RL per TC
+            const taxableAmountPerTC = rfPerTC + localPerTC + 300; // Per TC calculation
+            const percentageAmountPerTC = taxableAmountPerTC * 0.03; // 3% per TC
+            const taxePerTC = 20 + percentageAmountPerTC; // Tax per TC
+            taxeRegionaleMAD = taxePerTC * nbTC; // Total tax for all TCs
+        }
+        grandTotalMAD += taxeRegionaleMAD;
+        
+        // Update Taxe Régionale display
+        card.querySelector('.taxe-regionale-display').innerText = taxeRegionaleMAD.toLocaleString('fr-MA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        card.querySelector('.total-display').innerText = grandTotalMAD.toLocaleString('fr-MA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " DH";
+    }
+
+    function populateCardData(card, d, id) {
+        card.querySelector('.transporter-name').value = d.transporter || '';
+        card.querySelector('.nb-containers').value = d.nb || 1;
+        card.querySelector('.tc-type').value = d.type || '20';
+        card.querySelector('.rate-usd').value = d.usd || 10;
+        card.querySelector('.rate-eur').value = d.eur || 11;
+
+        card.querySelector('.fret-val').value = d.fret.val;
+        card.querySelector('.fret-cur').value = d.fret.cur;
+        if(d.fret.unit === 'bl') card.querySelectorAll(`input[name="fret_${id}"]`)[1].checked = true;
+
+        card.querySelector('.local-val').value = d.local.val;
+        card.querySelector('.local-cur').value = d.local.cur;
+        if(d.local.unit === 'bl') card.querySelectorAll(`input[name="local_${id}"]`)[1].checked = true;
+
+        card.querySelector('.rf-percent').value = d.rf;
+        card.querySelector('.taxe-regionale-val').value = d.taxeRegionale || 'non';
+        card.querySelector('.franchise-val').value = d.franchise;
+        card.querySelector('.transit-val').value = d.transit;
+
+        const tbody = card.querySelector('.other-fees-body');
+        tbody.innerHTML = '';
+        
+        if(!d.others || d.others.length === 0) {
+            addFeeRow(id);
+        } else {
+            d.others.forEach(rowD => addFeeRow(id, rowD));
+        }
+        calculateInstance(card);
+    }
+
+    // --- PAYMENT METHOD FUNCTIONS ---
+    function updatePaymentMethod() {
+        const paymentMethod = document.getElementById('payment-method').value;
+        const currentFolder = appData.folders.find(f => f.id === appData.activeFolderId);
+        if (currentFolder) {
+            currentFolder.paymentMethod = paymentMethod;
+            // Note: Saved when user explicitly saves a session
+        }
+    }
+
+    function loadPaymentMethod() {
+        const currentFolder = appData.folders.find(f => f.id === appData.activeFolderId);
+        if (currentFolder && currentFolder.paymentMethod) {
+            document.getElementById('payment-method').value = currentFolder.paymentMethod;
+        } else {
+            document.getElementById('payment-method').value = '';
+        }
+    }
+
+    function validatePaymentMethod() {
+        const paymentMethod = document.getElementById('payment-method').value;
+        if (!paymentMethod) {
+            alert('Veuillez choisir une méthode de paiement (CAD ou LIBRE) avant d\'imprimer.');
+            document.getElementById('payment-method').focus();
+            return false;
+        }
+        return true;
+    }
+
+    // --- PRINT FUNCTIONS ---
+    function printDoc() {
+        // Validate payment method first
+        if (!validatePaymentMethod()) {
+            return;
+        }
+        
+        saveCurrentState();
+        
+        // Hint the browser this is for printer
+        document.body.classList.add('print-mode');
+        document.body.classList.remove('print-single-mode', 'print-grid-mode');
+
+        // Apply print logic for printing
+        applyPrintLogic();
+        
+        window.print();
+
+        setTimeout(() => {
+            document.body.classList.remove('print-mode', 'print-single-mode', 'print-grid-mode');
+            cleanupPrintLogic();
+        }, 1000);
+    }
+
+    function applyPrintLogic() {
+        saveCurrentState();
+        
+        // Sync header name specifically before print
+        const currentFolder = appData.folders.find(f => f.id === appData.activeFolderId);
+        document.getElementById('print-folder-name').innerText = currentFolder.name;
+        
+        // Add payment method to print header
+        const paymentMethod = document.getElementById('payment-method').value;
+        const paymentMethodText = paymentMethod ? `Méthode de paiement: ${paymentMethod}` : '';
+        document.getElementById('print-payment-method').innerText = paymentMethodText;
+        
+        // Add current date to print header
+        const currentDate = new Date().toLocaleDateString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        document.getElementById('print-date').innerText = `Date: ${currentDate}`;
+
+        const cards = document.querySelectorAll('.calculator-card');
+        let cardCount = 0;
+
+        cards.forEach(card => {
+            cardCount++;
+            const tbody = card.querySelector('.other-fees-body');
+            // Sidebar will be handled conditionally
+            const sidebar = card.querySelector('.sidebar-cell');
+            const rows = Array.from(tbody.querySelectorAll('.other-row'));
+            
+            // 1. Reset structure: Ensure sidebar is in the very first row of tbody
+            if (rows.length > 0 && !rows[0].contains(sidebar)) {
+                rows[0].prepend(sidebar);
+            }
+
+            // 2. Identify visible rows
+            let visibleRows = [];
+            let hiddenRows = [];
+
+            rows.forEach(row => {
+                const val = parseFloat(row.querySelector('.other-val').value) || 0;
+                // Keep row if value > 0 OR description is not empty
+                if(val > 0 || row.querySelector('.other-desc').value.trim() !== '') {
+                    visibleRows.push(row);
+                } else {
+                    hiddenRows.push(row);
+                }
+            });
+
+            // 3. Logic to move sidebar to first VISIBLE row (only for printing)
+            if(visibleRows.length > 0) {
+                // Hide the empty ones ONLY during print
+                hiddenRows.forEach(r => r.classList.add('hide-on-print'));
+                visibleRows.forEach(r => r.classList.remove('hide-on-print'));
+
+                // Move sidebar
+                const firstVis = visibleRows[0];
+                if (!firstVis.contains(sidebar)) {
+                    firstVis.prepend(sidebar);
+                }
+                sidebar.rowSpan = visibleRows.length;
+            } else {
+                // If ALL are empty, hide the entire AUTRES FRAIS section
+                if (rows.length > 0) {
+                    tbody.classList.add('hide-on-print');
+                }
+            }
+            
+            // AFTER print setup, ensure all rows are visible again on screen
+            setTimeout(() => {
+                rows.forEach(r => r.classList.remove('hide-on-print'));
+                tbody.classList.remove('hide-on-print');
+            }, 100);
+        });
+
+        // Toggle Print Modes
+        const oldStyle = document.getElementById('print-orientation-style');
+        if(oldStyle) oldStyle.remove();
+
+        if (cardCount <= 1) {
+            // SINGLE = PORTRAIT
+            document.body.classList.add('print-single-mode');
+        } else {
+            // MULTI = HYBRID LAYOUT
+            document.body.classList.add('print-grid-mode');
+            
+            // Add class based on number of cards for layout control
+            if (cardCount === 3) {
+                document.body.classList.add('has-3-cards');
+            } else if (cardCount === 4) {
+                document.body.classList.add('has-4-cards');
+            } else if (cardCount >= 5) {
+                document.body.classList.add('has-many-cards');
+            }
+            
+            const style = document.createElement('style');
+            style.id = 'print-orientation-style';
+            style.innerHTML = '@page { size: portrait; margin: 5mm; }'; 
+            document.head.appendChild(style);
+        }
+    }
+
+    function cleanupPrintLogic() {
+        // Restore state after print
+        const s = document.getElementById('print-orientation-style');
+        if(s) s.remove();
+        document.body.classList.remove('print-single-mode', 'print-grid-mode', 'has-3-cards', 'has-4-cards', 'has-many-cards');
+        loadActiveFolder(); 
+    }
+
+    async function generateVectorPDF() {
+        if (!validatePaymentMethod()) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+        // --- CONFIGURATION ---
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const margin = 10;
+        
+        // Header Data
+        const folderName = document.getElementById('folder-title').innerText;
+        const paymentMethod = document.getElementById('payment-method').value;
+        const dateStr = new Date().toLocaleDateString('fr-FR');
+
+        // --- HELPERS ---
+        const drawRadio = (x, y, isChecked, isTC) => {
+            doc.setLineWidth(0.3);
+            
+            // Dark green for both TC and BL
+            doc.setDrawColor(46, 125, 50); // Dark green
+            if (isChecked) {
+                doc.setFillColor(46, 125, 50); // Dark green fill
+            }
+            
+            doc.circle(x, y, 1.5, 'S'); 
+            if (isChecked) {
+                doc.circle(x, y, 0.8, 'F');   
+            }
+            
+            // Reset color for next elements
+            doc.setDrawColor(0);
+        };
+
+        const centerText = (text, x, width, y) => {
+            doc.text(String(text), x + (width / 2), y, { align: 'center' });
+        };
+
+        // --- 1. DRAW PAGE HEADER ---
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text(folderName.toUpperCase(), margin, 15);
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Méthode de paiement: ${paymentMethod}`, pageWidth - margin, 10, { align: 'right' });
+        doc.setFont("helvetica", "normal");
+        doc.text(`Date: ${dateStr}`, pageWidth - margin, 15, { align: 'right' });
+
+        doc.setLineWidth(0.8);
+        doc.line(margin, 18, pageWidth - margin, 18);
+
+        // --- 2. PROCESS CARDS ---
+        const cards = document.querySelectorAll('.calculator-card');
+        const cardCount = cards.length;
+        
+        // Determine grid layout based on number of cards
+        let useGridLayout = false;
+        let cardWidth, cardGap, cardsPerRow;
+        
+        if (cardCount <= 2) {
+            // 1-2 calculations: Single column layout
+            useGridLayout = false;
+            cardWidth = pageWidth - (margin * 2); // Full width
+            cardGap = 5;
+            cardsPerRow = 1;
+        } else {
+            // 3-4 calculations: 2-column grid layout
+            useGridLayout = true;
+            cardGap = 8;
+            cardWidth = (pageWidth - (margin * 2) - cardGap) / 2; // ~91mm each
+            cardsPerRow = 2;
+        }
+        
+        let startY = 25;       // Y position where the current ROW starts
+        let colIndex = 0;      // 0 = Left, 1 = Right (only for grid mode)
+        let maxRowHeight = 0;  // Track the tallest card in the current row (only for grid mode)
+
+        cards.forEach((card, index) => {
+            // --- A. Extract Data ---
+            const transporter = card.querySelector('.transporter-name').value || "";
+            const qty = card.querySelector('.nb-containers').value;
+            
+            // FIX: Get Selected Text for Type (e.g. "20' TC") instead of value ("20")
+            const typeSelect = card.querySelector('.tc-type');
+            const type = typeSelect.options[typeSelect.selectedIndex].text;
+
+            // Rows Data
+            const rows = [];
+            
+            // Helper to grab value safely
+            const getVal = (sel) => {
+                const val = card.querySelector(sel).value;
+                return (val === "" || val === null) ? "-" : val;
+            };
+
+            // 1. Fret
+            const fretVal = getVal('.fret-val');
+            const fretCur = card.querySelector('.fret-cur').value;
+            const fretIsTC = card.querySelectorAll(`input[name^="fret_"]`)[0].checked;
+            rows.push({ type: 'standard', label: 'FRET', val: fretVal, cur: fretCur, isTC: fretIsTC });
+
+            // 2. Local
+            const locVal = getVal('.local-val');
+            const locCur = card.querySelector('.local-cur').value;
+            const locIsTC = card.querySelectorAll(`input[name^="local_"]`)[0].checked;
+            rows.push({ type: 'standard', label: 'FRAIS LOCAUX', val: locVal, cur: locCur, isTC: locIsTC });
+
+            // 3. RF
+            rows.push({ type: 'simple', label: 'RETOUR DE FOND', val: getVal('.rf-percent'), unit: '%' });
+            
+            // 4. Taxe Régionale
+            rows.push({ type: 'simple', label: 'TAXE RÉGIONALE', val: card.querySelector('.taxe-regionale-val').value, unit: '' });
+            
+            // 5. Franchise
+            const franVal = card.querySelector('.franchise-val').value;
+            rows.push({ type: 'simple', label: 'FRANCHISE', val: franVal || "-", unit: 'JR' });
+            
+            // 6. Transit
+            const transVal = card.querySelector('.transit-val').value;
+            rows.push({ type: 'simple', label: 'TRANSIT TIME', val: transVal || "-", unit: 'JR' });
+
+            // 6. Others (Dynamic Rows)
+            const otherRowsDOM = card.querySelectorAll('.other-row');
+            otherRowsDOM.forEach((r) => {
+                const val = r.querySelector('.other-val').value;
+                const desc = r.querySelector('.other-desc').value;
+                // Only add if there is data
+                if(val > 0 || desc.trim() !== '') {
+                    const cur = r.querySelector('.other-cur').value;
+                    const isTC = r.querySelectorAll('input[type="radio"]')[0].checked;
+                    rows.push({ 
+                        type: 'standard', 
+                        label: desc || 'Autre', 
+                        val: val, 
+                        cur: cur, 
+                        isTC: isTC, 
+                        isOther: true 
+                    });
+                }
+            });
+
+            // --- B. Calculate Height needed ---
+            const rowHeight = 6;
+            const headerHeight = 22;
+            const footerHeight = 15;
+            const totalCardHeight = headerHeight + (rows.length * rowHeight) + footerHeight + 5;
+
+            // Update the max height for this row
+            if (totalCardHeight > maxRowHeight) maxRowHeight = totalCardHeight;
+
+            // --- C. Pagination Check ---
+            // If this new card will exceed page height, add page
+            if (startY + totalCardHeight > pageHeight - 10) {
+                doc.addPage();
+                startY = 20;
+                if (useGridLayout) {
+                    maxRowHeight = totalCardHeight; // Reset max height for new page
+                }
+            }
+
+            // Calculate X position based on layout
+            let currentX;
+            if (useGridLayout) {
+                // Grid layout: alternate between left and right columns
+                currentX = (colIndex === 0) ? margin : margin + cardWidth + cardGap;
+            } else {
+                // Single column layout: always use margin (full width)
+                currentX = margin;
+            }
+            
+            let cursorY = startY; // Always start at the row's top Y
+
+            // --- D. DRAWING THE CARD ---
+            
+            // 1. Transporter Header Box
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.4);
+            doc.setFillColor(235, 235, 235);
+            
+            // Draw Header BG
+            doc.roundedRect(currentX, cursorY, cardWidth, 7, 1, 1, 'F');
+            doc.roundedRect(currentX, cursorY, cardWidth, 7, 1, 1, 'S');
+            
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0);
+            doc.text(`TRANSPORTEUR :  ${transporter}`, currentX + 3, cursorY + 4.5);
+            
+            cursorY += 8; // Move down
+
+            // 2. Qty / Type info
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            // Using the corrected 'type' variable here
+            doc.text(`QTÉ:  ${qty}         TYPE:  ${type}`, currentX + 3, cursorY + 3);
+            
+            cursorY += 5; // Move to Table Header
+
+            // --- E. DRAW TABLE HEADER ---
+            const wDesc = cardWidth * 0.40;
+            const wVal  = cardWidth * 0.20;
+            const wDev  = cardWidth * 0.15;
+            const wUnit = cardWidth * 0.25;
+            const wHalfUnit = wUnit / 2;
+
+            // Header Background
+            doc.setFillColor(230, 230, 230);
+            doc.rect(currentX + wDesc, cursorY, cardWidth - wDesc, 8, 'F');
+
+            // Main Headers
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "bold");
+            doc.setLineWidth(0.2);
+            
+            // Top Row
+            doc.rect(currentX, cursorY, cardWidth, 4); 
+            centerText("VALEUR", currentX + wDesc, wVal, cursorY + 3);
+            centerText("DEVISE", currentX + wDesc + wVal, wDev, cursorY + 3);
+            centerText("UNITE", currentX + wDesc + wVal + wDev, wUnit, cursorY + 3);
+
+            // Bottom Row
+            doc.rect(currentX, cursorY + 4, cardWidth, 4); 
+            doc.text("DESCRIPTION", currentX + 2, cursorY + 7);
+            centerText("TC", currentX + wDesc + wVal + wDev, wHalfUnit, cursorY + 7);
+            centerText("BL", currentX + wDesc + wVal + wDev + wHalfUnit, wHalfUnit, cursorY + 7);
+
+            // Vertical Lines
+            const lineY1 = cursorY;
+            const lineY2 = cursorY + 8;
+            doc.line(currentX + wDesc, lineY1, currentX + wDesc, lineY2);
+            doc.line(currentX + wDesc + wVal, lineY1, currentX + wDesc + wVal, lineY2);
+            doc.line(currentX + wDesc + wVal + wDev, lineY1, currentX + wDesc + wVal + wDev, lineY2);
+            doc.line(currentX + wDesc + wVal + wDev + wHalfUnit, cursorY + 4, currentX + wDesc + wVal + wDev + wHalfUnit, lineY2);
+
+            cursorY += 8;
+
+            // --- F. DRAW ROWS ---
+            rows.forEach((row, i) => {
+                // Row Box
+                doc.rect(currentX, cursorY, cardWidth, rowHeight);
+                
+                // Vertical Lines
+                doc.line(currentX + wDesc, cursorY, currentX + wDesc, cursorY + rowHeight);
+                doc.line(currentX + wDesc + wVal, cursorY, currentX + wDesc + wVal, cursorY + rowHeight);
+                doc.line(currentX + wDesc + wVal + wDev, cursorY, currentX + wDesc + wVal + wDev, cursorY + rowHeight);
+                
+                // Text
+                doc.setFontSize(6.5);
+                doc.setFont("helvetica", row.isOther ? "normal" : "bold");
+                doc.text(row.label.substring(0, 25), currentX + 2, cursorY + 4);
+
+                doc.setFont("helvetica", "normal");
+                centerText(String(row.val), currentX + wDesc, wVal, cursorY + 4);
+
+                const displayCur = row.cur || row.unit || "";
+                centerText(displayCur, currentX + wDesc + wVal, wDev, cursorY + 4);
+
+                if (row.type === 'standard') {
+                    doc.line(currentX + wDesc + wVal + wDev + wHalfUnit, cursorY, currentX + wDesc + wVal + wDev + wHalfUnit, cursorY + rowHeight);
+                    // TC Position (blue)
+                    drawRadio(currentX + wDesc + wVal + wDev + (wHalfUnit/2), cursorY + 3, row.isTC, true);
+                    // BL Position (green)
+                    drawRadio(currentX + wDesc + wVal + wDev + wHalfUnit + (wHalfUnit/2), cursorY + 3, !row.isTC, false);
+                } else {
+                    doc.setFillColor(240, 240, 240);
+                    doc.rect(currentX + wDesc + wVal + wDev, cursorY, wUnit, rowHeight, 'F');
+                    doc.rect(currentX + wDesc + wVal + wDev, cursorY, wUnit, rowHeight, 'S');
+                }
+                cursorY += rowHeight;
+            });
+
+            // --- G. TOTAL BOX ---
+            const totalTxt = card.querySelector('.total-display').innerText;
+            const rfTxt = card.querySelector('.rf-display').innerText;
+            const taxeRegionaleTxt = card.querySelector('.taxe-regionale-display').innerText;
+
+            cursorY += 2; 
+
+            // Draw Total
+            doc.setFillColor(240, 240, 240);
+            doc.rect(currentX, cursorY, cardWidth, 12, 'F');
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.5);
+            doc.rect(currentX, cursorY, cardWidth, 12);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8);
+            doc.text(`TOTAL: ${totalTxt}`, currentX + 3, cursorY + 8);
+            
+            cursorY += 8;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.setTextColor(100);
+            doc.text(`(Dont RF : ${rfTxt} DH)`, currentX + cardWidth - 6, cursorY + 10, { align: 'right' });
+            cursorY += 4;
+            doc.text(`(Dont Taxe Régionale : ${taxeRegionaleTxt} DH)`, currentX + cardWidth - 6, cursorY + 10, { align: 'right' });
+            doc.setTextColor(0); 
+
+            // Draw Outer Border for the whole card
+            // We do this last to ensure it wraps everything neatly
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.4);
+            doc.roundedRect(currentX, startY, cardWidth, totalCardHeight, 2, 2);
+
+            // --- H. GRID POSITIONING LOGIC ---
+            if (useGridLayout) {
+                // Grid layout: handle 2-column positioning
+                if (colIndex === 0) {
+                    colIndex = 1;
+                    // Do NOT change startY yet.
+                } else {
+                    colIndex = 0;
+                    // Move startY down by the height of the TALLEST card in this row
+                    startY += maxRowHeight + cardGap; 
+                    maxRowHeight = 0; // Reset for next row
+                }
+            } else {
+                // Single column layout: always move down after each card
+                startY += totalCardHeight + cardGap;
+            }
+        });
+
+        const filename = `Dossier_${folderName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+        doc.save(filename);
+    }
+</script>
+
+</body>
+</html>
