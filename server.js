@@ -5,32 +5,54 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const path = require('path');
 
+// Check if we're in Vercel environment
+const isVercel = process.env.VERCEL === '1';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: isVercel ? true : ['http://localhost:3000'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Log all requests
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-});
+if (!isVercel) {
+    app.use((req, res, next) => {
+        console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+        next();
+    });
+}
 
 // Session configuration
-app.use(session({
-    secret: 'your-secret-key-change-this-in-production',
+const sessionConfig = {
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: false, // Set to true if using HTTPS
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        secure: isVercel ? true : false, // HTTPS in production
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: isVercel ? 'none' : 'lax'
     }
-}));
+};
+
+// For Vercel, we need to adjust session store
+if (isVercel) {
+    // Use memory store for Vercel (note: this will reset on redeploy)
+    const MemoryStore = require('express-session').MemoryStore;
+    sessionConfig.store = new MemoryStore({
+        checkPeriod: 86400000 // 24 hours
+    });
+}
+
+app.use(session(sessionConfig));
 
 // Database initialization
-const db = new sqlite3.Database('./logistics_calculator.db');
+// For Vercel, we need to use a different database approach
+const dbPath = isVercel ? '/tmp/logistics_calculator.db' : './logistics_calculator.db';
+const db = new sqlite3.Database(dbPath);
 
 // Create tables if they don't exist
 db.serialize(() => {
@@ -53,7 +75,45 @@ db.serialize(() => {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
     )`);
+
+    // Auto-create test users
+    createTestUsers();
 });
+
+// Function to create test users
+async function createTestUsers() {
+    const testUsers = [
+        {
+            username: 'admin',
+            email: 'admin@logistics.com',
+            password: 'admin123'
+        },
+        {
+            username: 'user1',
+            email: 'user1@logistics.com', 
+            password: 'user123'
+        }
+    ];
+
+    for (const user of testUsers) {
+        try {
+            const hashedPassword = await bcrypt.hash(user.password, 10);
+            
+            db.run('INSERT OR IGNORE INTO users (username, email, password) VALUES (?, ?, ?)', 
+                [user.username, user.email, hashedPassword], 
+                function(err) {
+                    if (err) {
+                        console.error(`Error creating user ${user.username}:`, err);
+                    } else if (this.changes > 0) {
+                        console.log(`✅ Created test user: ${user.username}`);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error(`Error hashing password for ${user.username}:`, error);
+        }
+    }
+}
 
 // Middleware to check if user is authenticated
 function isAuthenticated(req, res, next) {
@@ -266,6 +326,12 @@ app.delete('/api/sessions/:sessionId', isAuthenticated, (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+if (isVercel) {
+    // Export for Vercel serverless
+    module.exports = app;
+} else {
+    // Start local server
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}
